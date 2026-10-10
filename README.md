@@ -24,6 +24,31 @@ Built with **n8n**, **OpenAI** (Groq as fallback), **Google Sheets** and **Gmail
 - Error alert on Telegram when any workflow fails
 
 ---
+## 📸 Screenshots
+
+### Main bot workflow
+![Main bot workflow](docs/screenshot/01-main-bot.png)
+
+### Stock Restore on Cancel
+![Stock Restore on Cancel](docs/screenshot/02-stock-restore.png)
+
+### Stock Updater
+![Stock Updater](docs/screenshot/03-stock-updater.png)
+
+### Error Alert
+![Error Alert](docs/screenshot/04-Error-alert.png)
+
+### Daily Sales Report
+![Daily Sales Report](docs/screenshot/05-Daily-sale-report.png)
+
+### Telegram order flow
+![Telegram order flow](docs/screenshot/06-telegram-order.png)
+
+### Owner commands
+![Owner commands](docs/screenshot/07-owner-commands.png)
+
+### Daily sale report Gamil
+![Daily sale report Gamil](docs/screenshot/08-Daily-sale-report-Gamil.png)
 
 ## 🤖 Owner Commands
 
