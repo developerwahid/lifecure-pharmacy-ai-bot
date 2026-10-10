@@ -1,0 +1,392 @@
+{
+  "name": "Stock Updater",
+  "nodes": [
+    {
+      "parameters": {
+        "jsCode": "const orders = $('Google Sheets Trigger1').all().map(i => i.json);\nconst meds = $input.all().map(i => i.json);\n\nconst LOW = 5; // is se kam bacha to low stock alert\nconst stock = {};\nmeds.forEach(m => {\n  stock[String(m['Medicine Name']).trim().toLowerCase()] = { name: m['Medicine Name'], qty: Number(m['Quantity']) };\n});\n\nconst out = [];\nconst touched = new Set();\n\norders.forEach(order => {\n  const names = String(order['Medicine Name']).split(',').map(s => s.trim()).filter(Boolean);\n  const qtys = String(order['Quantity']).split(',').map(s => Number(s.trim()));\n\n  names.forEach((name, i) => {\n    const qty = qtys[i] || 0;\n    const med = stock[name.toLowerCase()];\n    if (!med) {\n      out.push({ json: { update: false, alert: `⚠️ Order #${order['Order ID']}: \"${name}\" sheet mein nahi mili. Stock update nahi hua.` } });\n      return;\n    }\n    if (qty > med.qty) {\n      out.push({ json: { update: false, alert: `❌ Order #${order['Order ID']}: ${med.name} ka stock kam tha (stock ${med.qty}, order ${qty}). Stock 0 kar diya, check karo.` } });\n    }\n    med.qty = Math.max(med.qty - qty, 0);\n    touched.add(name.toLowerCase());\n  });\n});\n\ntouched.forEach(key => {\n  const med = stock[key];\n  let alert = '';\n  if (med.qty === 0) alert = `🚫 ${med.name} Out of Stock ho gayi.`;\n  else if (med.qty < LOW) alert = `⚠️ Low stock: ${med.name} sirf ${med.qty} bacha hai.`;\n  out.push({ json: { update: true, medicine: med.name, newQty: med.qty, alert } });\n});\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        384,
+        0
+      ],
+      "id": "d6a514ca-a5ed-4311-b448-db2815971766",
+      "name": "Calculate New Stock"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f0bce0fb-f4b2-4624-927e-4a356b28e10e",
+              "leftValue": "={{ $json.update }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        688,
+        0
+      ],
+      "id": "b84fcea0-c37e-434e-8422-0124332da7ca",
+      "name": "If Update?"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8",
+          "mode": "list",
+          "cachedResultName": "Medicine_DB",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEET_IDusp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Medicine_data",
+          "cachedResultUrl": "https://YOUR_GOOGLE_SHEET_ID/spreadsheets/d/1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Medicine Name": "={{ $json.medicine }}",
+            "row_number": 0,
+            "Quantity": "={{ $json.newQty }}"
+          },
+          "matchingColumns": [
+            "Medicine Name"
+          ],
+          "schema": [
+            {
+              "id": "Medicine Name",
+              "displayName": "Medicine Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Generic Name",
+              "displayName": "Generic Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Price",
+              "displayName": "Price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Stock",
+              "displayName": "Stock",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        944,
+        -16
+      ],
+      "id": "ec76f549-0f1d-49dd-978c-8fbea94329bb",
+      "name": "Update row in sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mpVhF4bqRk3AJL7M",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "65d51f81-f605-4ab0-b3cc-f949f34a3501",
+              "leftValue": "={{ $json.alert }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        544,
+        160
+      ],
+      "id": "b834c4f0-b720-4927-9733-13a60d422948",
+      "name": "If Has Alert?"
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_OWNER_CHAT_ID",
+        "text": "={{ $json.alert }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        944,
+        144
+      ],
+      "id": "5838a9e2-32bb-4628-bbe3-a5e1ce2c2f71",
+      "name": "Send Alert",
+      "webhookId": "ea87b3ec-224b-468d-9b66-1649af8219b1",
+      "credentials": {
+        "telegramApi": {
+          "id": "mTjYH46Fb25HHbg3",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8",
+          "mode": "list",
+          "cachedResultName": "Medicine_DB",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEET_IDusp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Medicine_data",
+          "cachedResultUrl": "https://YOUR_GOOGLE_SHEET_ID/spreadsheets/d/1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        176,
+        0
+      ],
+      "id": "25fd3b6e-1408-4fa4-8781-0efe90d38be3",
+      "name": "Get row(s) Get Medicines",
+      "alwaysOutputData": false,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mpVhF4bqRk3AJL7M",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8",
+          "mode": "list",
+          "cachedResultName": "Medicine_DB",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEET_IDusp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 938618003,
+          "mode": "list",
+          "cachedResultName": "Customer_Orders",
+          "cachedResultUrl": "https://YOUR_GOOGLE_SHEET_ID/spreadsheets/d/1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8/edit#gid=938618003"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        0
+      ],
+      "id": "21f86dee-f1e9-470f-928d-efa18b28b7c2",
+      "name": "Google Sheets Trigger1",
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "FAGtJz5YqWwzpxf4",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Calculate New Stock": {
+      "main": [
+        [
+          {
+            "node": "If Update?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "If Has Alert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Update?": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        []
+      ]
+    },
+    "If Has Alert?": {
+      "main": [
+        [
+          {
+            "node": "Send Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) Get Medicines": {
+      "main": [
+        [
+          {
+            "node": "Calculate New Stock",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) Get Medicines",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "QNPZIOMzYvV80RJX",
+    "callerPolicy": "workflowsFromSameOwner",
+    "timezone": "Asia/Kolkata"
+  },
+  "versionId": "7128f83b-5b09-458d-adfc-931f56560255",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "335be0eb5efb92b4e7f592da49832f9b2abb2335153f6788d0d3d781231a14d9"
+  },
+  "nodeGroups": [],
+  "id": "gmQJXvCJ2zIvYk8A",
+  "tags": []
+}

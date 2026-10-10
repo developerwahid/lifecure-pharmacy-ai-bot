@@ -1,0 +1,1060 @@
+{
+  "name": "Lifecurepharmacy",
+  "nodes": [
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        992,
+        0
+      ],
+      "id": "548830a7-0bac-43f0-9dc9-3f9c188ed907",
+      "name": "Send a text message",
+      "webhookId": "6de1777d-1732-4cfa-8390-11bc391309e6",
+      "credentials": {
+        "telegramApi": {
+          "id": "mTjYH46Fb25HHbg3",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=   Name: {{ $('Telegram Trigger').item.json.message.from.first_name }} {{ $('Telegram Trigger').item.json.message.from.last_name ?? '' }}, Message: {{ $('Telegram Trigger').item.json.message.text }}, Next Order ID: {{ $('Next Order ID').item.json.nextId }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "You are the AI assistant for Life Cure Pharmacy on Telegram. Be polite, professional, caring. Never reveal rule numbers, step names or internal reasoning in a reply; the customer sees only the final natural message.\n\n## CONTEXT\nEvery message arrives as: \"Name: [Telegram profile name], Message: [what the customer typed], Next Order ID: [number]\".\n\"Name:\" is the Telegram profile name, not typed by the customer (empty or undefined = unknown). Apply all rules to the text after \"Message:\" only. \"Next Order ID\" is system-generated: use it as the Order ID and never change or guess it.\n\n## RULE 0 - LANGUAGE (classify the current message fresh every time)\n- If the customer's message has no Devanagari letters, every word of your reply, including the greeting, must be in Latin script (Hinglish or English). Never answer a Latin-script message with even one Devanagari line.\n- Devanagari script: reply in Hindi (Devanagari).\n- Latin script with any Hindi word (hai, kya, chahiye, mujhe, kar do, nahi, haan, ha, mein, theek, bilkul, etc., including a lone \"haan\"/\"ha\"): reply in Hinglish (Latin script).\n- Pure English: reply in English. Unsure: Hinglish.\n- Never use Devanagari unless the customer did. Never mix languages. Never carry over the earlier language.\n- Templates below are written in English. Translate them to the reply language, but keep these labels in English: Medicine Name, Price, Stock, Quantity, Category, Customer Name, Total Price, Delivery Address, Contact Number.\n- Use these exact lines when the reply is Hinglish: \"Kya main is order ko confirm kar doon? 😊 (Haan/Nahi)\", \"Sure! Order place karne ke liye, kripya yeh details bhejo.\", \"Yeh information milte hi main aapka order confirm kar dunga.\", \"Bilkul, main abhi [Medicine] ki details check karta hoon. 😊\"\n- Use these exact lines when the reply is Hindi: \"क्या मैं ऑर्डर कन्फ़र्म कर दूं? 😊 (हां/नहीं)\", \"बिल्कुल! ऑर्डर देने के लिए, कृपया यह जानकारी भेजें।\", \"यह जानकारी मिलते ही मैं आपका ऑर्डर कन्फर्म कर दूंगा।\", \"बिल्कुल, मैं अभी [Medicine] के बारे में जानकारी देख लेता हूं। 😊\"\n\n## RULE 1 - GREETING (hi/hello, name unknown)\nCall no tool. Reply ONLY with: \"Hello, this is Life Cure Pharmacy. How can I help you?\" Hindi: \"नमस्ते, यह लाइफ क्योर फार्मेसी है। मैं आपकी क्या मदद कर सकता हूं?\"\n\n## RULE 2 - IDENTITY (\"who are you\")\nSay you are Life Cure Pharmacy's AI assistant who helps find medicines, check details and place orders. Then ask what medicine they need.\n\n## RULE 3 - NAME INTRO (hi/hello, name known)\nCall no tool. Reply ONLY with this exact text, nothing extra: \"Hello [Name]! Welcome to Life Cure Pharmacy. How can I help you today?\" Hindi: \"नमस्ते [Name]! लाइफ क्योर फार्मेसी में आपका स्वागत है। आज मैं आपकी क्या मदद कर सकता हूं?\"\n\n## RULE 4 - MEDICINE QUERY\nSearch Google Sheets with the tool for every medicine or symptom query, even if it was discussed earlier. Never reuse price, stock or quantity from chat history. Never invent medicines, prices or stock. Show the exact live Quantity from the sheet (never default to 1).\nOpen with one warm line (see the exact lines in RULE 0), then use the RULE 5 format.\n\n## RULE 4B - SYMPTOM QUERY\nIf the customer names a symptom (dard, bukhar, khansi) instead of a medicine, search the Category column immediately and list 2-4 in-stock matches in RULE 5 format, then ask which to order. Ask a clarifying question only if nothing matches.\n\n## RULE 5 - MEDICINE FORMAT\nMedicine Name: [x]\nPrice: [x] / Per strip\nStock: [Yes/No]\nQuantity: [x]\nCategory: [x]\nEnd with: \"Let me know if you'd like to order or need info on another medicine!\"\n\n## RULE 6 - TYPOS AND OUT OF STOCK\nAuto-correct typos (dolo = Dolo). Out of stock: apologise, show no price or quantity, offer another medicine. Not found: say so politely and ask the customer to confirm the spelling.\n\n## RULE 6B - AVAILABLE QUANTITY CHECK\nBefore STEP A, compare the requested quantity with the live Quantity from the sheet.\nIf requested quantity is MORE than available, reply with ONLY this one short message and nothing else (no medicine details block, no Order Summary, no Grand Total, no alternatives):\nHinglish: \"Sorry, [Medicine] ki sirf [x] strip available hain. Kya main [x] strip ka order bana doon? 😊 (Haan/Nahi)\"\nEnglish: \"Sorry, only [x] strips of [Medicine] are available. Shall I prepare the order for [x] strips? 😊 (Yes/No)\"\nWait for the answer. Only after the customer says yes, show STEP A with the available quantity.\nDecide availability ONLY from the live Quantity number: Quantity 0 = out of stock, Quantity 1 or more = in stock. Never say \"out of stock\" when Quantity is 1 or more.\nIf Quantity is 0, follow RULE 6 (out of stock).\nIf Quantity is enough, continue to STEP A as usual.\n\n## RULE 7 - ORDER CONFIRMATION (two steps)\n\nSTEP A (order summary):\nWhen the customer asks for a new order or changes an unconfirmed one (any wording: \"order kar do\", \"de do\", \"chahiye\", a quantity change), always do a fresh STEP A, never an automatic Yes. Start directly with \"Order Summary\" (no opening line):\n\nOrder Summary\n1. Medicine Name: [x] | Quantity: [x] | Total Price: ₹[Qty x Price]\n(one line per medicine)\n\nGrand Total: ₹[sum]\n\nShall I confirm this order? 😊 (Yes/No)\n\nThe reply ENDS there. Do not ask for name, address, number or email, show no blanks, and add nothing after the question.\n\nSTEP B (details):\nOnly when your previous message was the STEP A question and the customer answers it with a plain yes/no. Any new medicine, quantity or change instead is a new STEP A.\n- No / nahi: offer other help. Do not ask for details.\n- Yes / haan / ha: the name is known if \"Name:\" is not empty or the customer typed a name. Ask ONLY for what is still missing, together in one message, using ______ blanks:\n  \"Sure! To place your order, please share these details.\n  Delivery address: ______\n  Contact number: ______\n  Email (optional): ______\n  Once I have this information, I'll confirm your order right away.\"\n  Add \"Your full name: ______\" as the first line only if the name is unknown.\n  The email is optional: ask for it only once, never block the order if the customer skips it.\n  If address and number were already typed earlier in this conversation, go straight to RULE 9.\n\n## RULE 8 - HARD GATE (overrides everything)\nCall Append row or Gmail, or write \"Order Confirmed!\", ONLY when ALL are true:\n1. The customer has answered Yes to the STEP A question.\n2. The name is real (from \"Name:\" or typed by the customer).\n3. The delivery address was typed by the customer in this conversation and is a proper address (not one word, not a placeholder).\n4. The contact number was typed by the customer and has 10 digits.\nIf anything is missing: call NO tool, do not say the order is confirmed, ask ONLY for what is missing, and wait. Never invent or fill placeholders (\"address\", \"phone\", \"N/A\", \"TBD\", ______). If name, address and number arrive in one message, split them correctly. The email is NOT part of this gate. This applies to every model and every path.\n\n## RULE 8B - ONE SAVE PER ORDER\nSave an order only once. After you have sent \"Order Confirmed!\" for an order, never call Append row again for that same order, even if the customer says \"ok\", \"thanks\" or asks again. Call Append row at most once per turn.\n\n## RULE 9 - SAVE ORDER\nCall the Append row tool and reply in the same turn:\n- Order ID: the Next Order ID value (never a Telegram or chat ID).\n- Customer Name: the name the customer typed, otherwise the \"Name:\" value.\n- Customer Address: the address only, never name or phone.\n- Contact Number: digits only.\n- Medicine Name, Quantity, Price Per Unit: for several medicines, comma-separated in matching order (\"Dolo, Paracetamol 500mg\" / \"2, 2\" / \"35, 25\").\n- Total Price: the Grand Total.\n- Also save: Telegram Chat ID (from trigger data), Order Status = Confirmed, Order Date.\nReply:\nOrder Confirmed!\nOrder ID: #[Order ID]\nCustomer Name: [Name]\nMedicine Name: [Medicine 1], [Medicine 2]...\nQuantity: [Qty 1], [Qty 2]...\nTotal Price: ₹[Grand Total]\nDelivery Address: [Address]\nContact Number: [Phone]\n\n--- STATUS ---\n📦 Order confirmed! Rider 10-15 min me nikal raha hai.\n📞 Help ke liye call karein: YOUR_SHOP_PHONE\nStay safe & healthy! — Life Cure Pharmacy ❤️\n\n## RULE 11 - CHITCHAT\n- Thanks/shukriya: reply with warm thanks.\n- Customer says they are unwell: show empathy first, then help find the medicine.\n\n## RULE 12 - DELIVERY STATUS\n\"Kab tak aayegi\" etc.: the order is booked, the rider leaves in 10-15 minutes, call YOUR_SHOP_PHONE for urgent help.\n\n## RULE 12B - CANCEL ORDER\nIf the customer asks to cancel an order (\"cancel\", \"order cancel kar do\", \"mat bhejo\"):\n1. If the customer did not give an Order ID, ask: \"Kripya apna Order ID bataiye jo cancel karna hai. 😊\" and wait.\n2. When you have the Order ID, ask once: \"Kya main Order #[ID] cancel kar doon? 😊 (Haan/Nahi)\" and wait.\n3. Only after the customer says yes, call the Cancel Order tool once with that order_id, then reply: \"Aapka Order #[ID] cancel kar diya gaya hai. Kuch aur madad chahiye to bataiye. 😊\" (translate to the customer's language).\nCall Cancel Order at most once per turn. Never cancel without the customer's yes. Do not call Append row or any email tool for a cancel.\n\n## RULE 13 - EMAIL NOTIFICATIONS\nCall these only right after Append row succeeded in the same turn, for the same order. Never for a greeting, chitchat, thanks or medicine query. Fill each field separately and never write the email body yourself.\n\nA) Gmail tool (shop notification), always:\n- order_id\n- order_datetime: DD-MM-YYYY HH:MM AM/PM\n- customer_name\n- contact_number: digits only\n- delivery_address: address only\n- medicine_rows: one HTML row per medicine, like <tr><td>Paracetamol 500mg</td><td>2</td><td>₹25</td><td>₹50</td></tr> (Subtotal = Qty x Price). No table tag, no other text.\n- total_price: Grand Total as a number, without ₹\n\nB) Send Customer Email tool (confirmation to the customer), ONLY if the customer typed a valid email address (contains @ and a dot) in this conversation. Use the same fields as A plus customer_email. If no email was given, do not call it. Never guess an email or reuse one from another order."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        592,
+        0
+      ],
+      "id": "995175b4-f318-45cf-bd7c-3c497b11f208",
+      "name": "AI Agent",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Use this tool to search for medicine details from the Google Sheet based on the medicine name mentioned by the user.\nIf the user types a full sentence or extra words (like 'dolo hai' or 'ORS Sachet'), extract only the clean medicine keyword (like 'Dolo' or 'ORS') before searching. If the user asks for symptoms like 'dard', search the Category column.",
+        "documentId": {
+          "__rl": true,
+          "value": "1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8",
+          "mode": "list",
+          "cachedResultName": "Medicine_DB",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEET_IDusp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Medicine_data",
+          "cachedResultUrl": "https://YOUR_GOOGLE_SHEET_ID/spreadsheets/d/1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        304,
+        352
+      ],
+      "id": "50317792-9cc7-4b70-acd5-c3559f5b96e2",
+      "name": "Medicine Data Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mpVhF4bqRk3AJL7M",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Telegram Trigger').first().json.message.chat.id }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        144,
+        352
+      ],
+      "id": "aa3efb1e-70e4-4e46-9ed2-0d509de1ea0d",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -496,
+        0
+      ],
+      "id": "218fe7c1-4d99-4488-9c4e-72213be68da7",
+      "name": "Telegram Trigger",
+      "webhookId": "8fb1efff-66de-46ea-af4d-6511a3d630d7",
+      "credentials": {
+        "telegramApi": {
+          "id": "mTjYH46Fb25HHbg3",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "qwen/qwen3.8-27b",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        0,
+        352
+      ],
+      "id": "d0e13ad8-be33-4405-9842-fbe41a29c3b1",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "1vnITtYtYwa5pF6y",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1287f1c6-7acb-4d86-86f8-0497384c00fd",
+              "leftValue": "={{ typeof $json.message.text === 'string' && $json.message.text.trim().length > 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -64,
+        16
+      ],
+      "id": "613a7889-a776-4534-b868-0dd91e0195a7",
+      "name": "Has Text"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.message.from.id }}",
+        "text": "Kripya apna message text mein likh kar bhejein. Main abhi sirf text messages samajh sakta hoon. 😊",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        80,
+        80
+      ],
+      "id": "80e4e40e-db9c-4dd1-bc16-31c29d640a72",
+      "name": "Text Only Reply",
+      "webhookId": "bb27d6f8-8df0-496d-af1c-c2d2da645077",
+      "credentials": {
+        "telegramApi": {
+          "id": "mTjYH46Fb25HHbg3",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const ids = $input.all().map(i => Number(i.json['Order ID'])).filter(n => !isNaN(n));\nreturn [{ json: { nextId: (ids.length ? Math.max(...ids) : 0) + 1 } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        0
+      ],
+      "id": "ae9f7a25-24b6-4ba8-b2e6-4dccaee257b0",
+      "name": "Next Order ID"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $fromAI('customer_email', 'Customer email address typed by the customer', 'string') }}",
+        "subject": "=Order Confirmed #{{ $fromAI('order_id', 'Order ID number', 'string') }} - Life Cure Pharmacy",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\"> \n<style>\n  .tbl { width:100%; border-collapse:collapse; }\n  .tbl th { background:#f1f5f4; color:#375a52; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; text-align:left; padding:10px 12px; border-bottom:2px solid #d5e3df; }\n  .tbl td { font-size:14px; color:#222222; padding:10px 12px; border-bottom:1px solid #eeeeee; }\n</style>\n<title>Customer Details</title>\n</head>\n<body>\n<div style=\"background:#f4f6f5;padding:24px 0;font-family:Arial,Helvetica,sans-serif;\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" align=\"center\" style=\"max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e3e8e6;\">\n <tr>\n    <td style=\"background:#0f766e;padding:24px 28px;\">\n      <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n        <tr>\n          <td align=\"left\" style=\"width: 100px; vertical-align: middle; padding-right: 18px;\">\n              <img src=\"https://lh3.googleusercontent.com/d/1Ng2gDalChx-yp34ZF_TYVMFZpam98GEM\" alt=\"Life Cure Pharmacy Logo\" style=\"width: 100px; height: 100px; display: block; background: #ffffff; border-radius: 20%; border: none;\">\n          </td>\n\n          <td align=\"left\" style=\"vertical-align: middle;\">\n            <div style=\"color:#ffffff;font-size:24px;font-weight:bold;line-height:1.2;\">Life Cure Pharmacy</div>\n            <div style=\"color:#c7ebe6;font-size:14px;margin-top:6px;\">🎉 New Medicine Order Received</div>\n          </td>\n        </tr>\n      </table>\n    </td>\n  </tr>\n <tr>\n    <td style=\"padding:22px 28px 8px 28px;\">\n      <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n        <tr>\n          <td style=\"font-size:13px;color:#222222;\">{{ (() => { const h = Number($now.setZone('Asia/Kolkata').toFormat('H')); return h >= 5 && h < 12 ? '☀️ Good Morning' : h >= 12 && h < 17 ? '🌤️ Good Afternoon' : h >= 17 && h < 21 ? '🌆 Good Evening' : 'Hello'; })() }} <b>: {{ $fromAI('customer_name', 'Customer full name', 'string') }}</b>,</td>\n          <td align=\"right\" style=\"font-size:13px;color:#777777;\">Order Date &amp; Time<br><span style=\"font-size:14px;color:#222222;font-weight:bold;\">{{ $now.setZone('Asia/Kolkata').toFormat('dd-MM-yyyy hh:mm a') }}</span></td>\n        </tr>\n      </table>\n    </td>\n  </tr>\n \n  \n  <tr><td style=\"padding:22px 28px 6px 28px;font-size:15px;color:#222222;\">\n    Aapka order <b>#{{ $fromAI('order_id', 'Order ID number', 'string') }}</b><br>\n    <b>Confirm Ho Gaya Hai.🙏\n    Rider 10-15 Minute Mein Nikal Raha Hai.</b>\n  </td></tr>\n  \n  <tr>\n     <td style=\"padding:6px 28px 8px 28px;\">\n      <div style=\"font-size:12px;color:#375a52;text-transform:uppercase;letter-spacing:0.5px;font-weight:bold;margin-bottom:8px;\">Medicines Ordered</div>\n      <table class=\"tbl\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n        <tr><th>Medicine</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>\n       {{ $fromAI('medicine_rows', 'HTML table rows only, one per medicine, exactly like <tr><td>Paracetamol 500mg</td><td>2</td><td>₹25</td><td>₹50</td></tr>. No table tag, no other text.', 'string') }}\n    </table>\n</td>\n</tr>\n  <tr><td style=\"padding:6px 28px 16px 28px;\">\n    <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#0f766e;border-radius:8px;\"><tr>\n      <td style=\"padding:14px 16px;font-size:14px;color:#c7ebe6;\">Grand Total</td>\n      <td align=\"right\" style=\"padding:14px 16px;font-size:22px;color:#ffffff;font-weight:bold;\">₹{{ $fromAI('total_price', 'Grand total amount as a number only, without the rupee sign', 'string') }}</td>\n    </tr></table>\n  </td></tr>\n\n   <tr>\n    <td style=\"padding:14px 28px;\">\n      <div style=\"font-size:12px;color:#375a52;text-transform:uppercase;letter-spacing:0.5px;font-weight:bold;margin-bottom:8px;\">Customer Details</div>\n      <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f8faf9;border:1px solid #929694;border-radius:8px;\">\n        <tr><td style=\"padding:12px 14px;font-size:13px;color:#000000;\">Contact:</td><td style=\"padding:12px 14px;font-size:12px;color:#222222;font-weight:bold;\"> {{ $fromAI('contact_number', 'Contact number digits only', 'string') }}</td></tr>\n        <tr><td style=\"padding:12px 14px;font-size:13px;color:#000000;vertical-align:top;\">Delivery Address:</td><td style=\"padding:12px 14px;font-size:12px;color:#222222;font-weight:bold;\"> {{ $fromAI('delivery_address', 'Delivery address only, without name or phone', 'string') }}</td></tr>\n      </table>\n    </td>\n  </tr>\n\n  <tr>\n    <td style=\"background:#f8faf9;padding:16px 28px;border-top:1px solid #e3e8e6;font-size:12px;color:#888888;text-align:center;\">\n      Koi madad chahiye to call karein: YOUR_SHOP_PHONE <br> <span style=\"color: #0f766e;\">Life Cure Pharmacy </span> aapko achhi sehat ki shubhkamnayein ❤️\n    </td>\n</tr>\n</table>\n</div>\n</body>\n</html>",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        864,
+        336
+      ],
+      "id": "93f340bc-fe1e-4b2f-a725-ca3a132cab3d",
+      "name": "Send Customer Email",
+      "webhookId": "ad8d3e7c-b1e9-4d1d-98d1-853391377def",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "rZau44HDbrm4wpCU",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "YOUR_SHOP_PHONE",
+        "subject": "=🧾 New Order #{{ $fromAI('order_id', 'Order ID number', 'string') }} - {{ $fromAI('customer_name', 'Customer full name', 'string') }} (₹{{ $fromAI('total_price', 'Grand total amount as a number only, without the rupee sign', 'string') }}) - Life Cure Pharmacy",
+        "message": "=<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">   \n<style>\n  .tbl { width:100%; border-collapse:collapse; }\n  .tbl th { background:#f1f5f4; color:#375a52; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; text-align:left; padding:10px 12px; border-bottom:2px solid #d5e3df; }\n  .tbl td { font-size:14px; color:#222222; padding:10px 12px; border-bottom:1px solid #eeeeee; }\n</style>\n</head>\n<body style=\"margin:0;padding:0;background:#f4f6f5;font-family:Arial,Helvetica,sans-serif;\">\n<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f4f6f5;padding:24px 0;\">\n<tr><td align=\"center\">\n<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:600px;width:100%;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e3e8e6;\">\n\n \n  <tr>\n    <td style=\"background:#0f766e;padding:24px 28px;\">\n      <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">\n        <tr>\n         \n          <td align=\"left\" style=\"width: 100px; vertical-align: middle; padding-right: 18px;\">\n              <img src=\"https://lh3.googleusercontent.com/d/1Ng2gDalChx-yp34ZF_TYVMFZpam98GEM\" alt=\"Life Cure Pharmacy Logo\" style=\"width: 100px; height: 100px; display: block; background: #ffffff; border-radius: 20%; border: none;\">\n          </td>\n     \n          <td align=\"left\" style=\"vertical-align: middle;\">\n            <div style=\"color:#ffffff;font-size:24px;font-weight:bold;line-height:1.2;\">Life Cure Pharmacy</div>\n            <div style=\"color:#c7ebe6;font-size:14px;margin-top:6px;\">🎉 New Medicine Order Received</div>\n          </td>\n        </tr>\n      </table>\n    </td>\n  </tr>\n\n  <tr>\n    <td style=\"padding:22px 28px 8px 28px;\">\n      <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n        <tr>\n          <td style=\"font-size:13px;color:#777777;\">Order ID<br><span style=\"font-size:20px;color:#0f766e;font-weight:bold;\">#{{ $fromAI('order_id', 'Order ID number', 'string') }}</span></td>\n        <td align=\"right\" style=\"font-size:13px;color:#777777;\">Order Date &amp; Time<br><span style=\"font-size:14px;color:#222222;font-weight:bold;\">{{ $now.setZone('Asia/Kolkata').toFormat('dd-MM-yyyy hh:mm a') }}</span></td>\n\n        </tr>\n      </table>\n    </td>\n  </tr>\n\n  <tr>\n    <td style=\"padding:14px 28px;\">\n      <div style=\"font-size:12px;color:#375a52;text-transform:uppercase;letter-spacing:0.5px;font-weight:bold;margin-bottom:8px;\">Customer Details</div>\n      <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f8faf9;border:1px solid #929694;border-radius:8px;\">\n        <tr><td style=\"padding:12px 14px;font-size:14px;color:#000000;width:120px;\">Name</td><td style=\"padding:12px 14px;font-size:14px;color:#222222;font-weight:bold;\">{{ $fromAI('customer_name', 'Customer full name', 'string') }}</td></tr>\n        <tr><td style=\"padding:12px 14px;font-size:14px;color:#000000;\">Contact</td><td style=\"padding:12px 14px;font-size:14px;color:#222222;font-weight:bold;\">{{ $fromAI('contact_number', 'Contact number digits only', 'string') }}</td></tr>\n        <tr><td style=\"padding:12px 14px;font-size:14px;color:#000000;vertical-align:top;\">Address</td><td style=\"padding:12px 14px;font-size:14px;color:#222222;font-weight:bold;\">{{ $fromAI('delivery_address', 'Delivery address only, without name or phone', 'string') }}</td></tr>\n      </table>\n    </td>\n  </tr>\n\n  <tr>\n    <td style=\"padding:6px 28px 8px 28px;\">\n      <div style=\"font-size:12px;color:#375a52;text-transform:uppercase;letter-spacing:0.5px;font-weight:bold;margin-bottom:8px;\">Medicines Ordered</div>\n      <table class=\"tbl\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n        <tr><th>Medicine</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>\n       {{ $fromAI('medicine_rows', 'HTML table rows only, one per medicine, exactly like <tr><td>Paracetamol 500mg</td><td>2</td><td>₹25</td><td>₹50</td></tr>. No table tag, no other text.', 'string') }}\n      </table>\n    </td>\n  </tr>\n\n  <tr>\n    <td style=\"padding:8px 28px 24px 28px;\">\n      <table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#0f766e;border-radius:8px;\">\n        <tr>\n          <td style=\"padding:14px 16px;font-size:14px;color:#c7ebe6;\">Grand Total</td>\n          <td align=\"right\" style=\"padding:14px 16px;font-size:22px;color:#ffffff;font-weight:bold;\">₹{{ $fromAI('total_price', 'Grand total amount as a number only, without the rupee sign', 'string') }}</td>\n        </tr>\n      </table>\n    </td>\n  </tr>\n\n  <tr>\n    <td style=\"background:#f8faf9;padding:16px 28px;border-top:1px solid #e3e8e6;font-size:12px;color:#888888;text-align:center;\">\n      Yeh order Telegram bot se receive hua hai. Rider ko 10-15 minute mein bhejna hai. Yeh Raha customer ka contact number: <strong>{{ $fromAI('contact_number', 'Contact number digits only', 'string') }}</strong>\n    </td>\n  </tr>\n</table>\n</td></tr>\n</table>\n</body>\n</html>\n",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.2,
+      "position": [
+        672,
+        336
+      ],
+      "id": "43adac27-a7b0-4f93-8ea0-52837123ef7d",
+      "name": "Send owner Gmail",
+      "webhookId": "f7c67f66-7cab-405b-ac14-b828242128f5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "rZau44HDbrm4wpCU",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8",
+          "mode": "list",
+          "cachedResultName": "Medicine_DB",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEET_IDusp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 938618003,
+          "mode": "list",
+          "cachedResultName": "Customer_Orders",
+          "cachedResultUrl": "https://YOUR_GOOGLE_SHEET_ID/spreadsheets/d/1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8/edit#gid=938618003"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Order Date": "={{ $now.setZone('Asia/Kolkata').toFormat('dd-MM-yyyy hh:mm a') }}",
+            "Order Status": "=Confirmed",
+            "Order ID": "={{ $('Next Order ID').first().json.nextId }}",
+            "Customer Name": "={{ $fromAI('Customer_Name', 'Customer full name as typed by the customer', 'string') }}",
+            "Medicine Name": "={{ $fromAI('Medicine_Name', 'Comma separated medicine names', 'string') }}",
+            "Quantity": "={{ $fromAI('Quantity', 'Comma separated quantities in same order', 'string') }}",
+            "Price Per Unit": "={{ $fromAI('Price_Per_Unit', 'Comma separated prices in same order', 'string') }}",
+            "Total Price": "={{ $fromAI('Total_Price', 'Grand total as a number', 'string') }}",
+            "Telegram Chat ID": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+            "Contact Number": "={{ $fromAI('Contact_Number', 'Contact number, digits only', 'string') }}",
+            "Customer Address": "={{ $fromAI('Customer_Address', 'Delivery address only, without name or phone', 'string') }}",
+            "Customer Email": "={{ $fromAI('Customer_Email', 'Customer email address if the customer typed one, otherwise an empty string. Never write N/A or none.', 'string') }}"
+          },
+          "matchingColumns": [
+            "Order ID"
+          ],
+          "schema": [
+            {
+              "id": "Order ID",
+              "displayName": "Order ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Customer Name",
+              "displayName": "Customer Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Contact Number",
+              "displayName": "Contact Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Customer Email",
+              "displayName": "Customer Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Customer Address",
+              "displayName": "Customer Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Medicine Name",
+              "displayName": "Medicine Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Price Per Unit",
+              "displayName": "Price Per Unit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Total Price",
+              "displayName": "Total Price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Order Status",
+              "displayName": "Order Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Order Date",
+              "displayName": "Order Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Telegram Chat ID",
+              "displayName": "Telegram Chat ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        480,
+        336
+      ],
+      "id": "0576f9c4-37e4-4f28-8a35-5b5be7914cd8",
+      "name": "Append row sheet in Customer query",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mpVhF4bqRk3AJL7M",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8",
+          "mode": "list",
+          "cachedResultName": "Medicine_DB",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEET_IDusp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 938618003,
+          "mode": "list",
+          "cachedResultName": "Customer_Orders",
+          "cachedResultUrl": "https://YOUR_GOOGLE_SHEET_ID/spreadsheets/d/1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8/edit#gid=938618003"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Order Status": "Cancelled",
+            "Order ID": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Order_ID', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "Order ID"
+          ],
+          "schema": [
+            {
+              "id": "Order ID",
+              "displayName": "Order ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Customer Name",
+              "displayName": "Customer Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Contact Number",
+              "displayName": "Contact Number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Customer Email",
+              "displayName": "Customer Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Customer Address",
+              "displayName": "Customer Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Medicine Name",
+              "displayName": "Medicine Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Price Per Unit",
+              "displayName": "Price Per Unit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Total Price",
+              "displayName": "Total Price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Order Status",
+              "displayName": "Order Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Order Date",
+              "displayName": "Order Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Telegram Chat ID",
+              "displayName": "Telegram Chat ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Stock Restored",
+              "displayName": "Stock Restored",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1056,
+        336
+      ],
+      "id": "2ac80b9b-d50f-4e94-8dfa-4f2e2a4ca462",
+      "name": "Update row Cancelled_Order",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mpVhF4bqRk3AJL7M",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "free/gpt-6-luna",
+          "mode": "list",
+          "cachedResultName": "free/gpt-6-luna"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -192,
+        352
+      ],
+      "id": "8e1ca1f2-67d0-4d3a-a331-e58c73ce1ffe",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "LDvsrIH5VqxlKWaP",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8",
+          "mode": "list",
+          "cachedResultName": "Medicine_DB",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEET_IDusp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 938618003,
+          "mode": "list",
+          "cachedResultName": "Customer_Orders",
+          "cachedResultUrl": "https://YOUR_GOOGLE_SHEET_ID/spreadsheets/d/1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8/edit#gid=938618003"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        208,
+        0
+      ],
+      "id": "4ff1fdf2-ede2-4abe-97ca-8473e1afd32b",
+      "name": "Get Orders1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mpVhF4bqRk3AJL7M",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e87e8ec3-b1ed-4b4a-a8f1-b06d3eed472c",
+              "leftValue": "={{ $json.message.from.id }}",
+              "rightValue": "={{ YOUR_OWNER_CHAT_ID }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "ce85de8b-52c3-4e79-820d-7aaad8f8fadd",
+              "leftValue": "={{ $json.message.text }}",
+              "rightValue": "/",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -288,
+        0
+      ],
+      "id": "3bcce7fe-cde4-4e39-82f1-e6476c539183",
+      "name": "If Is Owner Command?"
+    },
+    {
+      "parameters": {
+        "chatId": "=YOUR_OWNER_CHAT_ID",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        992,
+        -144
+      ],
+      "id": "fe979bb8-d452-4859-97d9-c36e1d206bd1",
+      "name": "Send owner Send Help",
+      "webhookId": "43f391ba-5437-45f0-9410-76c6403a6c0f",
+      "credentials": {
+        "telegramApi": {
+          "id": "mTjYH46Fb25HHbg3",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = String($('Telegram Trigger').first().json.message.text || '').trim().toLowerCase().split('@')[0];\nconst orders = $('Get Orders Cmd').all().map(i => i.json).filter(o => o['Order ID']);\nconst meds = $('Get Medicines Cmd').all().map(i => i.json).filter(m => m['Medicine Name']);\nconst today = $now.setZone('Asia/Kolkata').toFormat('dd-MM-yyyy');\nconst LOW = 10;\nconst line = '━━━━━━━━━━━━━━';\n\nconst icon = q => Number(q) <= 0 ? '❌' : Number(q) <= LOW ? '⚠️' : '✅';\n\nconst help = '🛠 OWNER COMMANDS\\n' + line +\n  '\\n\\n📦 /todayorders\\nAaj ke orders\\n\\n💰 /totalsales\\nAaj ki total sale\\n\\n📋 /stock\\nSaari medicines ka stock' +\n  '\\n\\n🧾 /order + ID\\nJis order ki details dekhni ho, uska ID likho\\nJaise: /order 5  ya  /order5' +\n  '\\n\\n❓ /help\\nYe list';\n\nconst todayOk = orders.filter(o =>\n  String(o['Order Date'] || '').startsWith(today) &&\n  String(o['Order Status'] || '').trim().toLowerCase() !== 'cancelled');\n\nlet reply = help;\n\nif (text === '/todayorders') {\n  reply = todayOk.length\n    ? '📦 AAJ KE ORDERS (' + todayOk.length + ')\\n' + line + '\\n\\n' + todayOk.map(o =>\n        '🧾 Order #' + o['Order ID'] + '\\n👤 ' + o['Customer Name'] + '\\n💊 ' + o['Medicine Name'] + '\\n💰 ₹' + o['Total Price']).join('\\n\\n')\n    : '📦 AAJ KE ORDERS\\n' + line + '\\n\\nAaj abhi tak koi order nahi aaya.';\n} else if (text === '/totalsales') {\n  const sum = todayOk.reduce((s, o) => s + Number(o['Total Price'] || 0), 0);\n  reply = '💰 AAJ KI SALE\\n' + line + '\\n\\n📦 Orders: ' + todayOk.length + '\\n💵 Total: ₹' + sum;\n} else if (text === '/stock') {\n  reply = '📋 STOCK LIST\\n' + line + '\\n\\n' +\n    meds.map((m, i) => icon(m['Quantity']) + ' ' + (i + 1) + '. ' + m['Medicine Name'] + ' — ' + m['Quantity']).join('\\n') +\n    '\\n\\n' + line + '\\n✅ Theek   ⚠️ Kam   ❌ Khatam';\n} else if (text === '/lowstock') {\n  const low = meds.filter(m => Number(m['Quantity']) <= LOW);\n  reply = low.length\n    ? '⚠️ KAM STOCK (' + low.length + ')\\n' + line + '\\n\\n' +\n      low.map((m, i) => icon(m['Quantity']) + ' ' + (i + 1) + '. ' + m['Medicine Name'] + ' — ' + m['Quantity']).join('\\n')\n    : '✅ Sab medicines ka stock theek hai.';\n} else if (/^\\/order\\s*\\d+$/.test(text)) {\n  const id = text.replace(/\\D/g, '');\n  const o = orders.find(x => String(x['Order ID']).replace(/\\D/g, '') === id);\n  reply = o\n    ? '🧾 ORDER #' + o['Order ID'] + '\\n' + line +\n      '\\n\\n👤 Naam: ' + o['Customer Name'] +\n      '\\n📞 Phone: ' + o['Contact Number'] +\n      '\\n📍 Address: ' + o['Customer Address'] +\n      '\\n\\n💊 Medicine: ' + o['Medicine Name'] +\n      '\\n🔢 Qty: ' + o['Quantity'] +\n      '\\n💰 Total: ₹' + o['Total Price'] +\n      '\\n\\n📌 Status: ' + o['Order Status'] +\n      '\\n🕒 Date: ' + o['Order Date']\n    : '❌ Order #' + id + ' nahi mila.';\n}\n\nreturn [{ json: { text: reply } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        -144
+      ],
+      "id": "f6bcd69b-7c93-4d47-afdd-def8cf6c98a6",
+      "name": "Code in JavaScript",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8",
+          "mode": "list",
+          "cachedResultName": "Medicine_DB",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEET_IDusp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 938618003,
+          "mode": "list",
+          "cachedResultName": "Customer_Orders",
+          "cachedResultUrl": "https://YOUR_GOOGLE_SHEET_ID/spreadsheets/d/1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8/edit#gid=938618003"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -64,
+        -144
+      ],
+      "id": "2ddef463-b7df-4cc5-84d7-fa89f836589b",
+      "name": "Get Orders Cmd",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mpVhF4bqRk3AJL7M",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8",
+          "mode": "list",
+          "cachedResultName": "Medicine_DB",
+          "cachedResultUrl": "YOUR_GOOGLE_SHEET_IDusp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Medicine_data",
+          "cachedResultUrl": "https://YOUR_GOOGLE_SHEET_ID/spreadsheets/d/1CpwNuUGK8nXH3VFRrH76StBC5aaiSRQYPRThsGBUYA8/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        208,
+        -144
+      ],
+      "id": "e4b1440f-bc27-420b-941e-143d184e6d28",
+      "name": "Get Medicines Cmd",
+      "alwaysOutputData": true,
+      "executeOnce": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "mpVhF4bqRk3AJL7M",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Medicine Data Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If Is Owner Command?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Has Text": {
+      "main": [
+        [
+          {
+            "node": "Get Orders1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Text Only Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Order ID": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Customer Email": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send owner Gmail": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row sheet in Customer query": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row Cancelled_Order": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Orders1": {
+      "main": [
+        [
+          {
+            "node": "Next Order ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Is Owner Command?": {
+      "main": [
+        [
+          {
+            "node": "Get Orders Cmd",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Has Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send owner Send Help",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Orders Cmd": {
+      "main": [
+        [
+          {
+            "node": "Get Medicines Cmd",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Medicines Cmd": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "QNPZIOMzYvV80RJX",
+    "timezone": "Asia/Kolkata"
+  },
+  "versionId": "b4e3406d-594a-4e32-a7a0-d3985d941e00",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "335be0eb5efb92b4e7f592da49832f9b2abb2335153f6788d0d3d781231a14d9"
+  },
+  "nodeGroups": [],
+  "id": "2iL8PsRvQUNNXVrB",
+  "tags": []
+}
